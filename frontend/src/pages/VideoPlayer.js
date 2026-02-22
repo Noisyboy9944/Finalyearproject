@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import ReactPlayer from 'react-player/youtube';
+import ReactPlayer from 'react-player';
 import { ArrowLeft, CheckCircle, Play } from '@phosphor-icons/react';
 import clsx from 'clsx';
 
