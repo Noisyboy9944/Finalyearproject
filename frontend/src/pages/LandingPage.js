@@ -1,245 +1,248 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { CaretRight, Student, Brain, Users, ChalkboardTeacher, ArrowDown } from '@phosphor-icons/react';
+import { CaretRight, Sparkle, Compass, Users, Trophy } from '@phosphor-icons/react';
 
-// --- Helper Components ---
+// --- Assets ---
+const IMAGES = {
+    spark: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?q=80&w=2070&auto=format&fit=crop", // Student thinking/writing
+    chaos: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=2190&auto=format&fit=crop", // Library/Books
+    clarity: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=2070&auto=format&fit=crop", // Clean minimal desk/laptop
+    community: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop", // People working together
+    success: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=2070&auto=format&fit=crop" // Graduation/Happy
+};
 
-const SplitText = ({ text, delay = 0 }) => {
-    return text.split("").map((char, index) => (
-        <motion.span
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: delay + index * 0.05, duration: 0.5 }}
-            className="inline-block"
-        >
-            {char === " " ? "\u00A0" : char}
-        </motion.span>
-    ));
-}
+// --- Components ---
 
-const FeatureSection = ({ title, desc, img, icon, align, index }) => {
-    const ref = useRef(null);
-    const { scrollYProgress } = useScroll({
-        target: ref,
-        offset: ["start end", "end start"]
-    });
-
-    const y = useTransform(scrollYProgress, [0, 1], [100, -100]);
-    const opacity = useTransform(scrollYProgress, [0, 0.3, 0.8, 1], [0, 1, 1, 0]);
-    const scale = useTransform(scrollYProgress, [0, 0.5], [0.8, 1]);
-
+const NarrativeSection = ({ step, currentStep, text, title, icon }) => {
     return (
-        <section ref={ref} className="min-h-[80vh] flex items-center justify-center px-6 relative py-32">
-             {/* Background Glow */}
-             <div className={`absolute top-1/2 ${align === 'left' ? 'left-0' : 'right-0'} w-1/2 h-1/2 bg-marketing-primary/5 blur-[120px] rounded-full -z-10`} />
-
-            <div className={`max-w-7xl w-full grid md:grid-cols-2 gap-20 items-center ${align === 'right' ? 'direction-rtl' : ''}`}>
-                <motion.div 
-                    style={{ opacity, x: align === 'left' ? -50 : 50 }}
-                    transition={{ duration: 0.8 }}
-                    className={`${align === 'right' ? 'md:order-2' : ''}`}
-                >
-                    <div className="p-8">
-                        <motion.div 
-                            initial={{ scale: 0 }}
-                            whileInView={{ scale: 1 }}
-                            viewport={{ once: true }}
-                            className="mb-8 p-4 bg-white/5 border border-white/10 rounded-2xl w-fit backdrop-blur-md"
-                        >
-                            {icon}
-                        </motion.div>
-                        <h2 className="text-5xl md:text-6xl font-serif text-white mb-8 leading-tight">
-                            {title.split(" ").map((word, i) => (
-                                <span key={i} className="block">{word}</span>
-                            ))}
-                        </h2>
-                        <p className="text-xl font-mono text-marketing-fg/70 leading-relaxed max-w-lg">{desc}</p>
-                    </div>
-                </motion.div>
-                
-                <motion.div 
-                    style={{ y, scale }}
-                    className={`${align === 'right' ? 'md:order-1' : ''} relative`}
-                >
-                    <div className="relative group perspective-1000">
-                        <div className="absolute inset-0 bg-marketing-primary/20 rounded-[2rem] transform translate-x-4 translate-y-4 group-hover:translate-x-6 group-hover:translate-y-6 transition-transform duration-700 ease-out blur-md" />
-                        <motion.img 
-                            whileHover={{ scale: 1.02, rotateX: 2, rotateY: 2 }}
-                            transition={{ type: "spring", stiffness: 300 }}
-                            src={img} 
-                            alt={title} 
-                            className="relative rounded-[2rem] shadow-2xl border border-white/10 w-full h-[500px] object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700" 
-                        />
-                         {/* Floating Badge */}
-                         <motion.div 
-                            animate={{ y: [0, -10, 0] }}
-                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: index * 0.5 }}
-                            className="absolute -bottom-8 -right-8 bg-black/80 backdrop-blur-xl border border-white/20 p-4 rounded-xl shadow-xl"
-                        >
-                            <span className="text-marketing-primary font-mono text-xs">FEATURE 0{index}</span>
-                        </motion.div>
-                    </div>
-                </motion.div>
+        <motion.div 
+            className={`min-h-screen flex flex-col justify-center p-8 md:p-16 max-w-2xl transition-opacity duration-500 ${Math.abs(currentStep - step) < 0.5 ? 'opacity-100 blur-0' : 'opacity-20 blur-sm'}`}
+        >
+            <div className="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-marketing-primary/10 text-marketing-primary border border-marketing-primary/20">
+                {icon}
             </div>
-        </section>
-    )
+            <h2 className="text-4xl md:text-6xl font-serif text-white mb-8 leading-tight">
+                {title}
+            </h2>
+            <p className="text-xl md:text-2xl font-mono text-marketing-fg/80 leading-relaxed">
+                {text}
+            </p>
+        </motion.div>
+    );
 }
-
-// --- Main Component ---
 
 const LandingPage = () => {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, {
-    stiffness: 100,
-    damping: 30,
-    restDelta: 0.001
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"]
   });
 
-  // Parallax for Hero
-  const heroY = useTransform(scrollYProgress, [0, 0.2], [0, 150]);
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  // Track which section is active based on scroll
+  const [activeStep, setActiveStep] = useState(0);
+
+  useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+
+  useEffect(() => {
+    const unsubscribe = scrollYProgress.on("change", (latest) => {
+        // Map scroll progress (0 to 1) to steps (0 to 4)
+        // We have 5 steps roughly
+        const step = latest * 5; 
+        setActiveStep(step);
+    });
+    return () => unsubscribe();
+  }, [scrollYProgress]);
+
+  // Hero Parallax
+  const heroRef = useRef(null);
+  const { scrollYProgress: heroProgress } = useScroll({
+      target: heroRef,
+      offset: ["start start", "end start"]
+  });
+  const heroY = useTransform(heroProgress, [0, 1], [0, 200]);
+  const heroOpacity = useTransform(heroProgress, [0, 0.5], [1, 0]);
 
   return (
-    <div className="bg-marketing-bg text-marketing-fg min-h-screen font-sans selection:bg-marketing-primary selection:text-black overflow-x-hidden">
+    <div className="bg-marketing-bg text-marketing-fg font-sans selection:bg-marketing-primary selection:text-black">
       
-      {/* Scroll Progress Bar */}
-      <motion.div
-        className="fixed top-0 left-0 right-0 h-1 bg-marketing-primary origin-left z-[100]"
-        style={{ scaleX }}
-      />
-
       {/* Navigation */}
-      <nav className="fixed w-full z-50 px-6 py-6 flex justify-between items-center backdrop-blur-md bg-marketing-bg/30 border-b border-white/5 transition-all duration-300">
+      <nav className="fixed w-full z-50 px-6 py-6 flex justify-between items-center backdrop-blur-md bg-marketing-bg/30 border-b border-white/5">
         <div className="text-2xl font-serif font-bold text-white tracking-tighter">UniLearnHub</div>
         <div className="flex gap-4">
-            <Link to="/login" className="px-6 py-2 rounded-full border border-white/20 text-marketing-fg font-mono hover:bg-white/10 transition-colors">
+            <Link to="/login" className="hidden md:block px-6 py-2 rounded-full border border-white/20 text-marketing-fg font-mono hover:bg-white/10 transition-colors">
                 Login
             </Link>
             <Link to="/register" className="px-6 py-2 rounded-full bg-marketing-primary text-black font-mono font-bold hover:bg-marketing-primary/90 transition-transform hover:scale-105">
-                Join Now
+                Start Learning
             </Link>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="h-screen flex items-center justify-center relative overflow-hidden perspective-1000">
+      {/* --- SCENE 1: THE SPARK (HERO) --- */}
+      <section ref={heroRef} className="h-screen flex flex-col items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 z-0">
-            <motion.div style={{ y: heroY }} className="w-full h-full">
-                <img 
-                    src="https://images.unsplash.com/photo-1680444873773-7c106c23ac52?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB1bml2ZXJzaXR5JTIwY2FtcHVzJTIwYXJjaGl0ZWN0dXJlfGVufDB8fHx8MTc3MTc0MDU5MHww&ixlib=rb-4.1.0&q=85" 
-                    className="w-full h-full object-cover opacity-30"
-                    alt="University Architecture"
-                />
-            </motion.div>
-            <div className="absolute inset-0 bg-gradient-to-b from-marketing-bg via-marketing-bg/80 to-marketing-bg" />
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay"></div>
+             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-marketing-primary/10 via-marketing-bg to-marketing-bg opacity-50 blur-3xl animate-pulse" />
+             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay"></div>
         </div>
 
-        <motion.div 
-            style={{ opacity: heroOpacity }}
-            className="z-10 text-center max-w-5xl px-6 relative"
-        >
-            <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                className="absolute -top-32 -left-32 w-64 h-64 bg-marketing-primary/20 rounded-full blur-[100px] animate-pulse"
-            />
-             <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
-                className="absolute -bottom-32 -right-32 w-64 h-64 bg-marketing-secondary/20 rounded-full blur-[100px] animate-pulse"
-            />
-
-            <h1 className="text-6xl md:text-9xl font-serif font-medium text-white mb-8 leading-tight tracking-tight">
-                <SplitText text="Knowledge is" delay={0} /> <br/> 
-                <span className="text-marketing-primary italic">
-                    <SplitText text="Limitless." delay={0.5} />
-                </span>
-            </h1>
-            
-            <motion.p 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8, duration: 0.8 }}
-                className="text-xl md:text-2xl font-mono text-marketing-fg/80 mb-12 max-w-3xl mx-auto"
+        <motion.div style={{ y: heroY, opacity: heroOpacity }} className="z-10 text-center px-6 max-w-5xl">
+            <motion.div 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="mb-8 inline-block"
             >
-                A new era of digital learning. Explore world-class courses, master complex subjects, and shape your future.
+                <span className="px-4 py-2 rounded-full border border-marketing-primary/30 text-marketing-primary bg-marketing-primary/5 font-mono text-sm tracking-widest uppercase">
+                    The Journey Begins Here
+                </span>
+            </motion.div>
+            
+            <motion.h1 
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2, duration: 1 }}
+                className="text-6xl md:text-9xl font-serif font-medium text-white mb-8 leading-none"
+            >
+                Knowledge <br/> 
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-marketing-primary to-marketing-accent">
+                    Awaits.
+                </span>
+            </motion.h1>
+
+            <motion.p 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.5, duration: 1 }}
+                className="text-xl md:text-2xl text-marketing-fg/60 max-w-2xl mx-auto font-mono mb-12"
+            >
+                Every expert was once a beginner who just refused to quit.
             </motion.p>
             
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1, duration: 0.8 }}
-                className="flex flex-col items-center gap-8"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1, duration: 1 }}
             >
-                <Link to="/register" className="group relative inline-flex items-center gap-3 px-10 py-5 bg-white text-black rounded-full text-lg font-mono font-bold overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]">
-                    <span className="relative z-10">Start Your Journey</span>
-                    <CaretRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
-                    <div className="absolute inset-0 bg-marketing-primary transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500" />
-                </Link>
-                
-                <motion.div 
+                 <span className="text-sm font-mono text-marketing-fg/40">Scroll to unfold the story</span>
+                 <motion.div 
                     animate={{ y: [0, 10, 0] }}
                     transition={{ repeat: Infinity, duration: 2 }}
-                    className="text-white/30"
+                    className="mt-4 flex justify-center text-marketing-fg/40"
                 >
-                    <ArrowDown size={32} />
+                    <CaretRight size={24} className="rotate-90" />
                 </motion.div>
             </motion.div>
         </motion.div>
       </section>
 
-      {/* Features Scrollytelling */}
-      <div className="relative z-10 space-y-32 py-32">
-        <FeatureSection 
-            title="Expert Mentorship"
-            desc="Learn directly from industry leaders and academic pioneers. Our instructors bring real-world experience to your screen, bridging the gap between theory and practice."
-            img="https://images.pexels.com/photos/8197553/pexels-photo-8197553.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
-            icon={<ChalkboardTeacher size={32} className="text-marketing-primary" />}
-            align="left"
-            index={1}
-        />
+      {/* --- THE NARRATIVE SCROLL CONTAINER --- */}
+      <div ref={containerRef} className="relative">
         
-        <FeatureSection 
-            title="Collaborative Growth"
-            desc="Join a community of ambitious learners. Share notes, discuss ideas, and grow together in a thriving ecosystem designed for peer-to-peer connection."
-            img="https://images.unsplash.com/photo-1741699427799-3fbb70fce948?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwyfHxzdHVkZW50cyUyMGNvbGxhYm9yYXRpbmclMjBsYXB0b3AlMjBsaWJyYXJ5fGVufDB8fHx8MTc3MTc0MDU5MXww&ixlib=rb-4.1.0&q=85"
-            icon={<Users size={32} className="text-marketing-accent" />}
-            align="right"
-            index={2}
-        />
+        {/* Sticky Visual Background */}
+        <div className="sticky top-0 h-screen w-full overflow-hidden -z-10">
+            {/* Image 1: Spark */}
+            <motion.img 
+                src={IMAGES.spark} 
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                style={{ opacity: activeStep < 1.5 ? 1 : 0 }}
+            />
+             {/* Image 2: Chaos */}
+            <motion.img 
+                src={IMAGES.chaos} 
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                style={{ opacity: activeStep >= 1.5 && activeStep < 2.5 ? 1 : 0 }}
+            />
+             {/* Image 3: Clarity */}
+            <motion.img 
+                src={IMAGES.clarity} 
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                style={{ opacity: activeStep >= 2.5 && activeStep < 3.5 ? 1 : 0 }}
+            />
+             {/* Image 4: Community */}
+            <motion.img 
+                src={IMAGES.community} 
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                style={{ opacity: activeStep >= 3.5 && activeStep < 4.5 ? 1 : 0 }}
+            />
+             {/* Image 5: Success */}
+            <motion.img 
+                src={IMAGES.success} 
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                style={{ opacity: activeStep >= 4.5 ? 1 : 0 }}
+            />
 
-        <FeatureSection 
-            title="AI-Powered Insights"
-            desc="Smart recommendations and progress tracking help you stay on top of your learning goals. Our adaptive engine tailors the curriculum to your pace."
-            img="https://images.pexels.com/photos/17483870/pexels-photo-17483870.png?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
-            icon={<Brain size={32} className="text-pink-500" />}
-            align="left"
-            index={3}
-        />
+            {/* Overlay Gradient to make text readable */}
+            <div className="absolute inset-0 bg-gradient-to-r from-marketing-bg via-marketing-bg/90 to-transparent md:w-3/4" />
+        </div>
+
+        {/* Scrolling Text Content */}
+        <div className="relative z-10 -mt-[100vh]"> {/* Pull up to overlap with the sticky container's start */}
+            
+            {/* Spacer for the first image to show before text arrives */}
+            <div className="h-[50vh]" />
+
+            {/* Step 1 */}
+            <NarrativeSection 
+                step={1}
+                currentStep={activeStep}
+                icon={<Sparkle size={32} />}
+                title="It starts with a question."
+                text="Curiosity is the engine of growth. But in a world of infinite information, where do you even begin?"
+            />
+
+            {/* Step 2 */}
+            <NarrativeSection 
+                step={2}
+                currentStep={activeStep}
+                icon={<Compass size={32} />}
+                title="The path is often unclear."
+                text="Tutorial hell. Outdated documentation. Disconnected videos. Trying to piece it all together feels like solving a puzzle in the dark."
+            />
+
+            {/* Step 3 */}
+            <NarrativeSection 
+                step={3}
+                currentStep={activeStep}
+                icon={<Trophy size={32} />}
+                title="Enter UniLearnHub."
+                text="A structured, crystal-clear curriculum designed to take you from 'Hello World' to 'System Architect'. No fluff, just mastery."
+            />
+
+            {/* Step 4 */}
+            <NarrativeSection 
+                step={4}
+                currentStep={activeStep}
+                icon={<Users size={32} />}
+                title="You never walk alone."
+                text="Join a global classroom. Debate ideas, review code, and grow alongside thousands of other ambitious minds."
+            />
+
+             {/* Step 5 */}
+             <div className="min-h-screen flex flex-col justify-center p-8 md:p-16 max-w-3xl">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.8 }}
+                    className="bg-marketing-surface/80 backdrop-blur-xl border border-white/10 p-12 rounded-3xl"
+                >
+                    <h2 className="text-5xl md:text-7xl font-serif text-white mb-6">
+                        Your future is waiting.
+                    </h2>
+                    <p className="text-xl text-marketing-fg/80 mb-10">
+                        The only thing standing between you and your potential is the decision to start.
+                    </p>
+                    <Link to="/register" className="inline-flex w-full md:w-auto justify-center items-center gap-3 px-12 py-6 bg-marketing-primary text-black text-xl font-bold rounded-full hover:scale-105 transition-transform shadow-[0_0_50px_-10px_rgba(163,230,53,0.5)]">
+                        Claim Your Spot <CaretRight size={24} weight="bold" />
+                    </Link>
+                </motion.div>
+            </div>
+
+            <div className="h-[20vh]" />
+        </div>
+
       </div>
 
-      {/* CTA Footer */}
-      <section className="py-40 px-6 bg-marketing-surface relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-            <motion.h2 
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="text-5xl md:text-7xl font-serif text-white mb-10"
-            >
-                Ready to redefine <br/> your future?
-            </motion.h2>
-            <Link to="/register" className="inline-block px-12 py-5 bg-marketing-primary text-black text-xl font-bold rounded-full hover:scale-105 transition-transform hover:shadow-[0_0_50px_-10px_rgba(163,230,53,0.5)]">
-                Get Started for Free
-            </Link>
-        </div>
-      </section>
     </div>
   );
 };
