@@ -3,6 +3,92 @@ import { motion, useScroll, useTransform, useSpring, useInView } from 'framer-mo
 import { Link } from 'react-router-dom';
 import { CaretRight, Student, Brain, Users, ChalkboardTeacher, ArrowDown } from '@phosphor-icons/react';
 
+// --- Helper Components ---
+
+const SplitText = ({ text, delay = 0 }) => {
+    return text.split("").map((char, index) => (
+        <motion.span
+            key={index}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: delay + index * 0.05, duration: 0.5 }}
+            className="inline-block"
+        >
+            {char === " " ? "\u00A0" : char}
+        </motion.span>
+    ));
+}
+
+const FeatureSection = ({ title, desc, img, icon, align, index }) => {
+    const ref = useRef(null);
+    const { scrollYProgress } = useScroll({
+        target: ref,
+        offset: ["start end", "end start"]
+    });
+
+    const y = useTransform(scrollYProgress, [0, 1], [100, -100]);
+    const opacity = useTransform(scrollYProgress, [0, 0.3, 0.8, 1], [0, 1, 1, 0]);
+    const scale = useTransform(scrollYProgress, [0, 0.5], [0.8, 1]);
+
+    return (
+        <section ref={ref} className="min-h-[80vh] flex items-center justify-center px-6 relative py-32">
+             {/* Background Glow */}
+             <div className={`absolute top-1/2 ${align === 'left' ? 'left-0' : 'right-0'} w-1/2 h-1/2 bg-marketing-primary/5 blur-[120px] rounded-full -z-10`} />
+
+            <div className={`max-w-7xl w-full grid md:grid-cols-2 gap-20 items-center ${align === 'right' ? 'direction-rtl' : ''}`}>
+                <motion.div 
+                    style={{ opacity, x: align === 'left' ? -50 : 50 }}
+                    transition={{ duration: 0.8 }}
+                    className={`${align === 'right' ? 'md:order-2' : ''}`}
+                >
+                    <div className="p-8">
+                        <motion.div 
+                            initial={{ scale: 0 }}
+                            whileInView={{ scale: 1 }}
+                            viewport={{ once: true }}
+                            className="mb-8 p-4 bg-white/5 border border-white/10 rounded-2xl w-fit backdrop-blur-md"
+                        >
+                            {icon}
+                        </motion.div>
+                        <h2 className="text-5xl md:text-6xl font-serif text-white mb-8 leading-tight">
+                            {title.split(" ").map((word, i) => (
+                                <span key={i} className="block">{word}</span>
+                            ))}
+                        </h2>
+                        <p className="text-xl font-mono text-marketing-fg/70 leading-relaxed max-w-lg">{desc}</p>
+                    </div>
+                </motion.div>
+                
+                <motion.div 
+                    style={{ y, scale }}
+                    className={`${align === 'right' ? 'md:order-1' : ''} relative`}
+                >
+                    <div className="relative group perspective-1000">
+                        <div className="absolute inset-0 bg-marketing-primary/20 rounded-[2rem] transform translate-x-4 translate-y-4 group-hover:translate-x-6 group-hover:translate-y-6 transition-transform duration-700 ease-out blur-md" />
+                        <motion.img 
+                            whileHover={{ scale: 1.02, rotateX: 2, rotateY: 2 }}
+                            transition={{ type: "spring", stiffness: 300 }}
+                            src={img} 
+                            alt={title} 
+                            className="relative rounded-[2rem] shadow-2xl border border-white/10 w-full h-[500px] object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700" 
+                        />
+                         {/* Floating Badge */}
+                         <motion.div 
+                            animate={{ y: [0, -10, 0] }}
+                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: index * 0.5 }}
+                            className="absolute -bottom-8 -right-8 bg-black/80 backdrop-blur-xl border border-white/20 p-4 rounded-xl shadow-xl"
+                        >
+                            <span className="text-marketing-primary font-mono text-xs">FEATURE 0{index}</span>
+                        </motion.div>
+                    </div>
+                </motion.div>
+            </div>
+        </section>
+    )
+}
+
+// --- Main Component ---
+
 const LandingPage = () => {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
@@ -157,87 +243,5 @@ const LandingPage = () => {
     </div>
   );
 };
-
-const SplitText = ({ text, delay = 0 }) => {
-    return text.split("").map((char, index) => (
-        <motion.span
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: delay + index * 0.05, duration: 0.5 }}
-            className="inline-block"
-        >
-            {char === " " ? "\u00A0" : char}
-        </motion.span>
-    ));
-}
-
-const FeatureSection = ({ title, desc, img, icon, align, index }) => {
-    const ref = useRef(null);
-    const { scrollYProgress } = useScroll({
-        target: ref,
-        offset: ["start end", "end start"]
-    });
-
-    const y = useTransform(scrollYProgress, [0, 1], [100, -100]);
-    const opacity = useTransform(scrollYProgress, [0, 0.3, 0.8, 1], [0, 1, 1, 0]);
-    const scale = useTransform(scrollYProgress, [0, 0.5], [0.8, 1]);
-
-    return (
-        <section ref={ref} className="min-h-[80vh] flex items-center justify-center px-6 relative">
-             {/* Background Glow */}
-             <div className={`absolute top-1/2 ${align === 'left' ? 'left-0' : 'right-0'} w-1/2 h-1/2 bg-marketing-primary/5 blur-[120px] rounded-full -z-10`} />
-
-            <div className={`max-w-7xl w-full grid md:grid-cols-2 gap-20 items-center ${align === 'right' ? 'direction-rtl' : ''}`}>
-                <motion.div 
-                    style={{ opacity, x: align === 'left' ? -50 : 50 }}
-                    transition={{ duration: 0.8 }}
-                    className={`${align === 'right' ? 'md:order-2' : ''}`}
-                >
-                    <div className="p-8">
-                        <motion.div 
-                            initial={{ scale: 0 }}
-                            whileInView={{ scale: 1 }}
-                            viewport={{ once: true }}
-                            className="mb-8 p-4 bg-white/5 border border-white/10 rounded-2xl w-fit backdrop-blur-md"
-                        >
-                            {icon}
-                        </motion.div>
-                        <h2 className="text-5xl md:text-6xl font-serif text-white mb-8 leading-tight">
-                            {title.split(" ").map((word, i) => (
-                                <span key={i} className="block">{word}</span>
-                            ))}
-                        </h2>
-                        <p className="text-xl font-mono text-marketing-fg/70 leading-relaxed max-w-lg">{desc}</p>
-                    </div>
-                </motion.div>
-                
-                <motion.div 
-                    style={{ y, scale }}
-                    className={`${align === 'right' ? 'md:order-1' : ''} relative`}
-                >
-                    <div className="relative group perspective-1000">
-                        <div className="absolute inset-0 bg-marketing-primary/20 rounded-[2rem] transform translate-x-4 translate-y-4 group-hover:translate-x-6 group-hover:translate-y-6 transition-transform duration-700 ease-out blur-md" />
-                        <motion.img 
-                            whileHover={{ scale: 1.02, rotateX: 2, rotateY: 2 }}
-                            transition={{ type: "spring", stiffness: 300 }}
-                            src={img} 
-                            alt={title} 
-                            className="relative rounded-[2rem] shadow-2xl border border-white/10 w-full h-[500px] object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700" 
-                        />
-                         {/* Floating Badge */}
-                         <motion.div 
-                            animate={{ y: [0, -10, 0] }}
-                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: index * 0.5 }}
-                            className="absolute -bottom-8 -right-8 bg-black/80 backdrop-blur-xl border border-white/20 p-4 rounded-xl shadow-xl"
-                        >
-                            <span className="text-marketing-primary font-mono text-xs">FEATURE 0{index}</span>
-                        </motion.div>
-                    </div>
-                </motion.div>
-            </div>
-        </section>
-    )
-}
 
 export default LandingPage;
