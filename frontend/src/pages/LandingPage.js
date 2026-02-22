@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { CaretRight, Sparkle, Compass, Users, Trophy } from '@phosphor-icons/react';
+import { CaretRight, Sparkle, Compass, Users, Trophy, Code, PaintBrush, TrendUp } from '@phosphor-icons/react';
 
 // --- Assets ---
 const IMAGES = {
@@ -11,6 +11,27 @@ const IMAGES = {
     community: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop", // People working together
     success: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=2070&auto=format&fit=crop" // Graduation/Happy
 };
+
+const SHOWCASE_IMAGES = [
+    {
+        title: "Full Stack Development",
+        desc: "Master React, Node.js, and Cloud Architecture.",
+        img: "https://images.unsplash.com/photo-1587691592099-24045742c181?q=80&w=2070&auto=format&fit=crop",
+        icon: <Code size={32} />
+    },
+    {
+        title: "UI/UX Design",
+        desc: "Craft intuitive interfaces and user experiences.",
+        img: "https://images.unsplash.com/photo-1726365222176-425a1a1b9b98?q=80&w=2070&auto=format&fit=crop",
+        icon: <PaintBrush size={32} />
+    },
+    {
+        title: "Data Science",
+        desc: "Analyze trends and build predictive models.",
+        img: "https://images.unsplash.com/photo-1531482984755-b51a25295306?q=80&w=2070&auto=format&fit=crop",
+        icon: <TrendUp size={32} />
+    }
+];
 
 // --- Components ---
 
@@ -32,6 +53,29 @@ const NarrativeSection = ({ step, currentStep, text, title, icon }) => {
     );
 }
 
+const ShowcaseCard = ({ item, index }) => {
+    return (
+        <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1, duration: 0.5 }}
+            whileHover={{ y: -10 }}
+            className="group relative overflow-hidden rounded-3xl bg-marketing-surface border border-white/10"
+        >
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10" />
+            <img src={item.img} alt={item.title} className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-700" />
+            <div className="p-8 relative z-20">
+                <div className="mb-4 text-marketing-primary">{item.icon}</div>
+                <h3 className="text-2xl font-serif text-white mb-2">{item.title}</h3>
+                <p className="text-marketing-fg/60 mb-6 font-mono text-sm">{item.desc}</p>
+                <Link to="/register" className="inline-flex items-center gap-2 text-marketing-accent font-bold hover:gap-3 transition-all">
+                    Explore Path <CaretRight />
+                </Link>
+            </div>
+        </motion.div>
+    );
+}
+
 const LandingPage = () => {
   const containerRef = useRef(null);
   const { scrollYProgress } = useScroll({
@@ -46,9 +90,8 @@ const LandingPage = () => {
 
   useEffect(() => {
     const unsubscribe = scrollYProgress.on("change", (latest) => {
-        // Map scroll progress (0 to 1) to steps (0 to 4)
-        // We have 5 steps roughly
-        const step = latest * 5; 
+        // Map scroll progress (0 to 1) to steps (0 to 6) - Adjusted for added section
+        const step = latest * 6; 
         setActiveStep(step);
     });
     return () => unsubscribe();
@@ -159,17 +202,17 @@ const LandingPage = () => {
                 className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
                 style={{ opacity: activeStep >= 2.5 && activeStep < 3.5 ? 1 : 0 }}
             />
-             {/* Image 4: Community */}
+             {/* Image 4: Community (Extended for Showcase) */}
             <motion.img 
                 src={IMAGES.community} 
                 className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-                style={{ opacity: activeStep >= 3.5 && activeStep < 4.5 ? 1 : 0 }}
+                style={{ opacity: activeStep >= 3.5 && activeStep < 5.5 ? 1 : 0 }}
             />
-             {/* Image 5: Success */}
+             {/* Image 5: Success (CTA) */}
             <motion.img 
                 src={IMAGES.success} 
                 className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-                style={{ opacity: activeStep >= 4.5 ? 1 : 0 }}
+                style={{ opacity: activeStep >= 5.5 ? 1 : 0 }}
             />
 
             {/* Overlay Gradient to make text readable */}
@@ -218,8 +261,20 @@ const LandingPage = () => {
                 text="Join a global classroom. Debate ideas, review code, and grow alongside thousands of other ambitious minds."
             />
 
-             {/* Step 5 */}
-             <div className="min-h-screen flex flex-col justify-center p-8 md:p-16 max-w-3xl">
+            {/* Step 5: Showcase Grid (New Section) */}
+             <div className={`min-h-screen flex flex-col justify-center p-8 transition-opacity duration-500 ${Math.abs(activeStep - 5) < 0.5 ? 'opacity-100 blur-0' : 'opacity-20 blur-sm'}`}>
+                <div className="max-w-7xl mx-auto w-full">
+                    <h2 className="text-4xl md:text-5xl font-serif text-white mb-12">Master In-Demand Skills</h2>
+                    <div className="grid md:grid-cols-3 gap-8 w-full">
+                        {SHOWCASE_IMAGES.map((item, index) => (
+                            <ShowcaseCard key={index} item={item} index={index} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+             {/* Step 6: Final CTA */}
+             <div className={`min-h-screen flex flex-col justify-center p-8 md:p-16 max-w-3xl transition-opacity duration-500 ${Math.abs(activeStep - 6) < 0.5 ? 'opacity-100 blur-0' : 'opacity-20 blur-sm'}`}>
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     whileInView={{ opacity: 1, scale: 1 }}
