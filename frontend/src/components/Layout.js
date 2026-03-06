@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { House, Books, SignOut, User } from '@phosphor-icons/react';
+import { House, Books, SignOut, User, Compass, ChatCircleDots } from '@phosphor-icons/react';
+import ChatBot from './ChatBot';
 
 const Layout = () => {
     const navigate = useNavigate();
@@ -9,6 +10,7 @@ const Layout = () => {
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('chat_session_id');
         navigate('/login');
     };
 
@@ -22,7 +24,7 @@ const Layout = () => {
 
                 <nav className="flex-1 p-4 space-y-2">
                     <NavItem to="/app" icon={<House size={20} />} label="Dashboard" end />
-                    {/* Add more items later if needed */}
+                    <NavItem to="/app/explore" icon={<Compass size={20} />} label="Explore Courses" />
                 </nav>
 
                 <div className="p-4 border-t border-lms-secondary">
@@ -49,6 +51,9 @@ const Layout = () => {
             <main className="flex-1 ml-64 p-8">
                 <Outlet />
             </main>
+
+            {/* Chatbot */}
+            <ChatBot />
         </div>
     );
 };

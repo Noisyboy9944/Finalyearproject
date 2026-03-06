@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import ProgramView from "./pages/ProgramView";
 import SubjectView from "./pages/SubjectView";
 import VideoPlayer from "./pages/VideoPlayer";
+import ExploreCourses from "./pages/ExploreCourses";
 import Layout from "./components/Layout";
 
 // Protected Route Wrapper
@@ -41,6 +42,7 @@ function App() {
                 {/* Protected LMS Routes */}
                 <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                     <Route index element={<Dashboard />} />
+                    <Route path="explore" element={<ExploreCourses />} />
                     <Route path="program/:programId" element={<ProgramView />} />
                     <Route path="subject/:subjectId" element={<SubjectView />} />
                     <Route path="unit/:unitId/video/:videoId" element={<VideoPlayer />} />

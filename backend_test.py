@@ -115,8 +115,7 @@ class UniLearnHubAPITester:
             "Get Programs",
             "GET",
             "programs",
-            200,
-            auth_required=True
+            200
         )
         if success and isinstance(response, list) and len(response) > 0:
             self.program_id = response[0].get('id')
@@ -134,8 +133,7 @@ class UniLearnHubAPITester:
             "Get Program Subjects",
             "GET",
             f"programs/{self.program_id}/subjects",
-            200,
-            auth_required=True
+            200
         )
         if success and isinstance(response, list) and len(response) > 0:
             self.subject_id = response[0].get('id')
@@ -153,8 +151,7 @@ class UniLearnHubAPITester:
             "Get Subject Units",
             "GET",
             f"subjects/{self.subject_id}/units",
-            200,
-            auth_required=True
+            200
         )
         if success and isinstance(response, list) and len(response) > 0:
             self.unit_id = response[0].get('id')
@@ -172,14 +169,140 @@ class UniLearnHubAPITester:
             "Get Unit Videos",
             "GET",
             f"units/{self.unit_id}/videos",
-            200,
-            auth_required=True
+            200
         )
         if success and isinstance(response, list) and len(response) > 0:
             self.video_id = response[0].get('id')
             print(f"   Found {len(response)} videos, first ID: {self.video_id}")
             return True
         return False
+
+    def test_get_unit_notes(self):
+        """Test getting course notes for a unit"""
+        if not self.unit_id:
+            print("❌ No unit ID available")
+            return False
+            
+        success, response = self.run_test(
+            "Get Unit Course Notes",
+            "GET",
+            f"units/{self.unit_id}/notes",
+            200
+        )
+        if success and isinstance(response, list):
+            print(f"   Found {len(response)} course notes")
+            return True
+        return False
+
+    def test_get_stats(self):
+        """Test getting platform statistics"""
+        success, response = self.run_test(
+            "Get Platform Stats",
+            "GET",
+            "stats",
+            200
+        )
+        if success and isinstance(response, dict):
+            stats_keys = ['programs', 'subjects', 'videos', 'students']
+            if all(key in response for key in stats_keys):
+                print(f"   Stats: {response['programs']} programs, {response['subjects']} subjects, {response['videos']} videos, {response['students']} students")
+                return True
+        return False
+
+    def test_explore_courses(self):
+        """Test explore courses endpoint"""
+        success, response = self.run_test(
+            "Explore Courses",
+            "GET",
+            "explore",
+            200
+        )
+        if success and isinstance(response, list) and len(response) > 0:
+            print(f"   Found {len(response)} programs with nested subjects")
+            # Check structure
+            first_program = response[0]
+            if 'subjects' in first_program and 'subjects_count' in first_program:
+                print(f"   First program has {first_program.get('subjects_count', 0)} subjects")
+                return True
+        return False
+
+    def test_chatbot(self):
+        """Test chatbot functionality"""
+        session_id = f"test-session-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Test sending a message
+        success, response = self.run_test(
+            "Send Chat Message",
+            "POST",
+            "chat",
+            200,
+            data={
+                "message": "What courses are available in the BCA program?",
+                "session_id": session_id
+            }
+        )
+        
+        if success and 'reply' in response and 'session_id' in response:
+            print(f"   Bot reply: {response['reply'][:100]}...")
+            
+            # Test getting chat history
+            success2, history = self.run_test(
+                "Get Chat History",
+                "GET",
+                f"chat/history/{session_id}",
+                200
+            )
+            
+            if success2 and isinstance(history, list) and len(history) >= 2:
+                print(f"   Chat history has {len(history)} messages")
+                return True
+        return False
+
+    def test_individual_endpoints(self):
+        """Test individual resource endpoints"""
+        results = []
+        
+        # Test individual program
+        if self.program_id:
+            success, response = self.run_test(
+                "Get Individual Program",
+                "GET",
+                f"programs/{self.program_id}",
+                200
+            )
+            results.append(success)
+        
+        # Test individual subject
+        if self.subject_id:
+            success, response = self.run_test(
+                "Get Individual Subject",
+                "GET",
+                f"subjects/{self.subject_id}",
+                200
+            )
+            results.append(success)
+        
+        # Test individual unit
+        if self.unit_id:
+            success, response = self.run_test(
+                "Get Individual Unit",
+                "GET",
+                f"units/{self.unit_id}",
+                200
+            )
+            results.append(success)
+        
+        # Test individual video
+        if self.video_id:
+            success, response = self.run_test(
+                "Get Individual Video",
+                "GET",
+                f"videos/{self.video_id}",
+                200
+            )
+            results.append(success)
+        
+        return all(results) if results else False
 
 def main():
     print("🚀 Starting UniLearnHub API Tests")
@@ -188,20 +311,26 @@ def main():
     # Setup
     tester = UniLearnHubAPITester()
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    test_email = f"test_user_{timestamp}@example.com"
-    test_password = "TestPass123!"
-    test_name = f"Test User {timestamp}"
+    test_email = f"student_{timestamp}@unilearnhub.com"
+    test_password = "SecurePass123!"
+    test_name = f"Student User {timestamp}"
 
-    # Test sequence
+    # Test sequence - following the exact order from review request
     tests = [
         ("Backend Health Check", lambda: tester.test_health_check()),
-        ("Seed Database", lambda: tester.test_seed_data()),
+        ("Seed Database (FIRST)", lambda: tester.test_seed_data()),
         ("User Registration", lambda: tester.test_register(test_email, test_password, test_name)),
         ("User Login", lambda: tester.test_login(test_email, test_password)),
-        ("Get Programs", lambda: tester.test_get_programs()),
+        ("Get Programs (should return 3)", lambda: tester.test_get_programs()),
+        ("Get Individual Program", lambda: tester.test_individual_endpoints() if hasattr(tester, 'program_id') and tester.program_id else False),
         ("Get Program Subjects", lambda: tester.test_get_program_subjects()),
         ("Get Subject Units", lambda: tester.test_get_subject_units()),
         ("Get Unit Videos", lambda: tester.test_get_unit_videos()),
+        ("Get Unit Course Notes", lambda: tester.test_get_unit_notes()),
+        ("Get Platform Stats", lambda: tester.test_get_stats()),
+        ("Explore Courses", lambda: tester.test_explore_courses()),
+        ("AI Chatbot Test", lambda: tester.test_chatbot()),
+        ("Individual Resource Endpoints", lambda: tester.test_individual_endpoints()),
     ]
 
     failed_tests = []
@@ -223,6 +352,13 @@ def main():
     
     if failed_tests:
         print(f"\n❌ Failed tests: {', '.join(failed_tests)}")
+        print("\n🔍 Key Test Requirements:")
+        print("- Seed endpoint must be tested FIRST (creates 3 programs)")
+        print("- Auth endpoints must work (register + login)")
+        print("- Programs endpoint should return 3 programs after seed")
+        print("- All CRUD endpoints should work with proper data flow")
+        print("- Chatbot should integrate with emergentintegrations LLM")
+        print("- Stats endpoint should show counts after seeding")
     else:
         print("\n✅ All tests passed!")
 
