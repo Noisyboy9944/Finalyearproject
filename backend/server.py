@@ -129,6 +129,15 @@ class ChatHistoryItem(BaseModel):
     content: str
     timestamp: str
 
+# --- Progress & Activity Models ---
+
+class VideoProgressInput(BaseModel):
+    video_id: str
+    unit_id: str
+
+class RatingInput(BaseModel):
+    rating: float = Field(ge=1, le=5)
+
 # --- Auth Helpers ---
 
 def verify_password(plain_password, hashed_password):
@@ -401,6 +410,194 @@ async def get_chat_history(session_id: str):
     return history
 
 # --- Stats ---
+# --- Video Progress & Study Streak ---
+
+@api_router.post("/progress/video")
+async def mark_video_watched(data: VideoProgressInput, user_email: str = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    today_str = now.strftime("%Y-%m-%d")
+    
+    # Check if already marked
+    existing = await db.video_progress.find_one({
+        "user_email": user_email, "video_id": data.video_id
+    })
+    if existing:
+        return {"message": "Already marked as watched", "already_watched": True}
+    
+    # Save video progress
+    await db.video_progress.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_email": user_email,
+        "video_id": data.video_id,
+        "unit_id": data.unit_id,
+        "watched_at": now.isoformat(),
+        "date": today_str
+    })
+    
+    # Record daily activity for streak
+    existing_activity = await db.user_activity.find_one({
+        "user_email": user_email, "date": today_str
+    })
+    if not existing_activity:
+        await db.user_activity.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_email": user_email,
+            "date": today_str,
+            "actions": 1
+        })
+    else:
+        await db.user_activity.update_one(
+            {"user_email": user_email, "date": today_str},
+            {"$inc": {"actions": 1}}
+        )
+    
+    return {"message": "Video marked as watched", "already_watched": False}
+
+@api_router.get("/progress/videos/{unit_id}")
+async def get_unit_video_progress(unit_id: str, user_email: str = Depends(get_current_user)):
+    progress = await db.video_progress.find(
+        {"user_email": user_email, "unit_id": unit_id},
+        {"_id": 0, "video_id": 1}
+    ).to_list(100)
+    watched_ids = [p["video_id"] for p in progress]
+    return {"watched_video_ids": watched_ids}
+
+@api_router.get("/progress/dashboard")
+async def get_dashboard_progress(user_email: str = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    
+    # --- Weekly Progress ---
+    # Get start of current week (Monday)
+    days_since_monday = now.weekday()
+    week_start = (now - timedelta(days=days_since_monday)).strftime("%Y-%m-%d")
+    
+    # Total videos in platform
+    total_videos = await db.videos.count_documents({})
+    
+    # Videos watched this week
+    weekly_watched = await db.video_progress.count_documents({
+        "user_email": user_email,
+        "date": {"$gte": week_start}
+    })
+    
+    # Total videos ever watched by user
+    total_watched = await db.video_progress.count_documents({
+        "user_email": user_email
+    })
+    
+    # Weekly progress as percentage (goal: watch at least 10 videos per week, or all if less)
+    weekly_goal = min(10, total_videos)
+    weekly_progress = min(100, int((weekly_watched / max(weekly_goal, 1)) * 100))
+    
+    # --- Study Streak ---
+    # Get all activity dates sorted descending
+    activities = await db.user_activity.find(
+        {"user_email": user_email},
+        {"_id": 0, "date": 1}
+    ).sort("date", -1).to_list(365)
+    
+    activity_dates = set(a["date"] for a in activities)
+    
+    streak = 0
+    check_date = now.date()
+    # If user was not active today, check from yesterday
+    today_str = check_date.strftime("%Y-%m-%d")
+    if today_str not in activity_dates:
+        check_date = check_date - timedelta(days=1)
+    
+    while True:
+        date_str = check_date.strftime("%Y-%m-%d")
+        if date_str in activity_dates:
+            streak += 1
+            check_date = check_date - timedelta(days=1)
+        else:
+            break
+    
+    # --- Overall completion ---
+    overall_progress = int((total_watched / max(total_videos, 1)) * 100) if total_videos > 0 else 0
+    
+    return {
+        "weekly_progress": weekly_progress,
+        "weekly_watched": weekly_watched,
+        "weekly_goal": weekly_goal,
+        "study_streak": streak,
+        "total_watched": total_watched,
+        "total_videos": total_videos,
+        "overall_progress": overall_progress
+    }
+
+# --- Ratings ---
+
+@api_router.post("/ratings/{program_id}")
+async def rate_program(program_id: str, data: RatingInput, user_email: str = Depends(get_current_user)):
+    # Check program exists
+    program = await db.programs.find_one({"id": program_id})
+    if not program:
+        raise HTTPException(status_code=404, detail="Program not found")
+    
+    # Upsert user rating
+    await db.user_ratings.update_one(
+        {"user_email": user_email, "program_id": program_id},
+        {"$set": {
+            "user_email": user_email,
+            "program_id": program_id,
+            "rating": data.rating,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Recalculate average rating for this program
+    pipeline = [
+        {"$match": {"program_id": program_id}},
+        {"$group": {"_id": None, "avg_rating": {"$avg": "$rating"}, "count": {"$sum": 1}}}
+    ]
+    result = await db.user_ratings.aggregate(pipeline).to_list(1)
+    
+    if result:
+        avg_rating = round(result[0]["avg_rating"], 1)
+        rating_count = result[0]["count"]
+    else:
+        avg_rating = data.rating
+        rating_count = 1
+    
+    # Update program with new average
+    await db.programs.update_one(
+        {"id": program_id},
+        {"$set": {"rating": avg_rating, "rating_count": rating_count}}
+    )
+    
+    return {
+        "message": "Rating saved",
+        "your_rating": data.rating,
+        "average_rating": avg_rating,
+        "total_ratings": rating_count
+    }
+
+@api_router.get("/ratings/{program_id}")
+async def get_program_rating(program_id: str, user_email: str = Depends(get_current_user)):
+    # Get user's own rating
+    user_rating = await db.user_ratings.find_one(
+        {"user_email": user_email, "program_id": program_id},
+        {"_id": 0, "rating": 1}
+    )
+    
+    # Get average
+    pipeline = [
+        {"$match": {"program_id": program_id}},
+        {"$group": {"_id": None, "avg_rating": {"$avg": "$rating"}, "count": {"$sum": 1}}}
+    ]
+    result = await db.user_ratings.aggregate(pipeline).to_list(1)
+    
+    avg_rating = result[0]["avg_rating"] if result else 0
+    total_ratings = result[0]["count"] if result else 0
+    
+    return {
+        "your_rating": user_rating["rating"] if user_rating else None,
+        "average_rating": round(avg_rating, 1),
+        "total_ratings": total_ratings
+    }
+
 @api_router.get("/stats")
 async def get_stats():
     programs_count = await db.programs.count_documents({})
@@ -411,7 +608,7 @@ async def get_stats():
         "programs": programs_count,
         "subjects": subjects_count,
         "videos": videos_count,
-        "students": users_count + 2847  # Base count for display
+        "students": users_count + 2847
     }
 
 # --- Explore All Courses ---
