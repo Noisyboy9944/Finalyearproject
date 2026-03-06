@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import ReactPlayer from 'react-player';
-import { ArrowLeft, CheckCircle, Play, NotePencil, VideoCamera } from '@phosphor-icons/react';
+import { ArrowLeft, Play, NotePencil, VideoCamera, FloppyDisk, PencilSimple, Eye, SpinnerGap, CheckCircle, BookOpen } from '@phosphor-icons/react';
 import clsx from 'clsx';
 
 const VideoPlayer = () => {
@@ -14,10 +14,21 @@ const VideoPlayer = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('playlist');
 
+    // User notes state
+    const [userNoteContent, setUserNoteContent] = useState('');
+    const [userNoteSaving, setUserNoteSaving] = useState(false);
+    const [userNoteSaved, setUserNoteSaved] = useState(false);
+    const [userNoteLastSaved, setUserNoteLastSaved] = useState(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const saveTimeoutRef = useRef(null);
+    const textareaRef = useRef(null);
+
+    const API_URL = process.env.REACT_APP_BACKEND_URL;
+    const token = localStorage.getItem('token');
+
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const API_URL = process.env.REACT_APP_BACKEND_URL;
                 const [videoRes, playlistRes, unitRes, notesRes] = await Promise.all([
                     axios.get(`${API_URL}/api/videos/${videoId}`),
                     axios.get(`${API_URL}/api/units/${unitId}/videos`),
@@ -29,6 +40,19 @@ const VideoPlayer = () => {
                 setPlaylist(playlistRes.data);
                 setUnit(unitRes.data);
                 setNotes(notesRes.data);
+
+                // Fetch user's personal note
+                try {
+                    const userNoteRes = await axios.get(`${API_URL}/api/user-notes/${unitId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (userNoteRes.data) {
+                        setUserNoteContent(userNoteRes.data.content || '');
+                        setUserNoteLastSaved(userNoteRes.data.updated_at);
+                    }
+                } catch (err) {
+                    // No user note yet - that's fine
+                }
             } catch (err) {
                 console.error(err);
             } finally {
@@ -36,7 +60,55 @@ const VideoPlayer = () => {
             }
         };
         fetchData();
-    }, [unitId, videoId]);
+    }, [unitId, videoId, API_URL, token]);
+
+    // Auto-save with debounce
+    const saveNote = useCallback(async (content) => {
+        setUserNoteSaving(true);
+        setUserNoteSaved(false);
+        try {
+            await axios.put(`${API_URL}/api/user-notes/${unitId}`, 
+                { content },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setUserNoteSaved(true);
+            setUserNoteLastSaved(new Date().toISOString());
+            setTimeout(() => setUserNoteSaved(false), 2000);
+        } catch (err) {
+            console.error('Failed to save note:', err);
+        } finally {
+            setUserNoteSaving(false);
+        }
+    }, [API_URL, unitId, token]);
+
+    const handleNoteChange = (e) => {
+        const content = e.target.value;
+        setUserNoteContent(content);
+        
+        // Debounced auto-save (1.5 seconds after last keystroke)
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        saveTimeoutRef.current = setTimeout(() => {
+            saveNote(content);
+        }, 1500);
+    };
+
+    const handleManualSave = () => {
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        saveNote(userNoteContent);
+    };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
 
     if (loading) return (
         <div className="flex items-center justify-center py-20">
@@ -44,7 +116,7 @@ const VideoPlayer = () => {
         </div>
     );
 
-    // Simple markdown renderer for notes
+    // Simple markdown renderer for course notes
     const renderMarkdown = (text) => {
         if (!text) return null;
         let html = text;
@@ -58,6 +130,28 @@ const VideoPlayer = () => {
         html = html.replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal text-lms-muted mb-1">$1</li>');
         html = html.replace(/\n/g, '<br/>');
         return <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: html }} />;
+    };
+
+    // Preview user notes as rendered markdown
+    const renderUserNotePreview = (text) => {
+        if (!text) return (
+            <div className="text-center py-8 text-gray-400">
+                <Eye size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Nothing to preview yet. Start writing!</p>
+            </div>
+        );
+        return renderMarkdown(text);
+    };
+
+    const formatTimestamp = (ts) => {
+        if (!ts) return '';
+        try {
+            const d = new Date(ts);
+            return d.toLocaleString('en-US', { 
+                month: 'short', day: 'numeric', 
+                hour: '2-digit', minute: '2-digit' 
+            });
+        } catch { return ''; }
     };
 
     return (
@@ -95,7 +189,7 @@ const VideoPlayer = () => {
                     <button
                         onClick={() => setActiveTab('playlist')}
                         className={clsx(
-                            "flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
+                            "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors",
                             activeTab === 'playlist' 
                                 ? "text-lms-primary border-b-2 border-lms-primary bg-white" 
                                 : "text-lms-muted hover:text-lms-fg"
@@ -106,18 +200,30 @@ const VideoPlayer = () => {
                     <button
                         onClick={() => setActiveTab('notes')}
                         className={clsx(
-                            "flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
+                            "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors",
                             activeTab === 'notes' 
                                 ? "text-lms-primary border-b-2 border-lms-primary bg-white" 
                                 : "text-lms-muted hover:text-lms-fg"
                         )}
                     >
-                        <NotePencil size={16} /> Notes {notes.length > 0 && <span className="text-xs bg-indigo-100 text-indigo-600 px-1.5 rounded-full">{notes.length}</span>}
+                        <BookOpen size={16} /> Course
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('mynotes'); setIsEditing(true); }}
+                        className={clsx(
+                            "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors",
+                            activeTab === 'mynotes' 
+                                ? "text-lms-primary border-b-2 border-lms-primary bg-white" 
+                                : "text-lms-muted hover:text-lms-fg"
+                        )}
+                    >
+                        <PencilSimple size={16} /> My Notes
                     </button>
                 </div>
 
                 {/* Tab Content */}
                 <div className="overflow-y-auto flex-1">
+                    {/* PLAYLIST TAB */}
                     {activeTab === 'playlist' && (
                         <div className="p-2 space-y-1">
                             <div className="px-3 py-2">
@@ -152,6 +258,7 @@ const VideoPlayer = () => {
                         </div>
                     )}
 
+                    {/* COURSE NOTES TAB (Read-only) */}
                     {activeTab === 'notes' && (
                         <div className="p-4">
                             {notes.length > 0 ? (
@@ -164,11 +271,89 @@ const VideoPlayer = () => {
                                 </div>
                             ) : (
                                 <div className="text-center py-12">
-                                    <NotePencil size={40} className="mx-auto text-gray-300 mb-3" />
-                                    <p className="text-sm text-lms-muted">No notes available for this unit yet.</p>
-                                    <p className="text-xs text-gray-400 mt-1">Try the AI chatbot for explanations!</p>
+                                    <BookOpen size={40} className="mx-auto text-gray-300 mb-3" />
+                                    <p className="text-sm text-lms-muted">No course notes available for this unit.</p>
+                                    <p className="text-xs text-gray-400 mt-1">Switch to "My Notes" to write your own!</p>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* MY NOTES TAB (Editable) */}
+                    {activeTab === 'mynotes' && (
+                        <div className="flex flex-col h-full">
+                            {/* Toolbar */}
+                            <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-gray-100 shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className={clsx(
+                                            "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5",
+                                            isEditing 
+                                                ? "bg-indigo-100 text-indigo-700" 
+                                                : "text-gray-500 hover:bg-gray-100"
+                                        )}
+                                    >
+                                        <PencilSimple size={14} /> Edit
+                                    </button>
+                                    <button
+                                        onClick={() => setIsEditing(false)}
+                                        className={clsx(
+                                            "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5",
+                                            !isEditing 
+                                                ? "bg-indigo-100 text-indigo-700" 
+                                                : "text-gray-500 hover:bg-gray-100"
+                                        )}
+                                    >
+                                        <Eye size={14} /> Preview
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {/* Save status indicator */}
+                                    {userNoteSaving && (
+                                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                                            <SpinnerGap size={12} className="animate-spin" /> Saving...
+                                        </span>
+                                    )}
+                                    {userNoteSaved && !userNoteSaving && (
+                                        <span className="flex items-center gap-1 text-xs text-green-500">
+                                            <CheckCircle size={12} weight="fill" /> Saved
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={handleManualSave}
+                                        disabled={userNoteSaving}
+                                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        <FloppyDisk size={14} /> Save
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Editor / Preview */}
+                            <div className="flex-1 p-4">
+                                {isEditing ? (
+                                    <div className="h-full flex flex-col">
+                                        <textarea
+                                            ref={textareaRef}
+                                            value={userNoteContent}
+                                            onChange={handleNoteChange}
+                                            placeholder={"Write your notes here...\n\nTips:\n• Use # for headings\n• Use **text** for bold\n• Use `code` for inline code\n• Use ``` for code blocks\n• Use - for bullet points"}
+                                            className="flex-1 w-full min-h-[300px] bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-700 font-mono leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 transition-all placeholder-gray-300"
+                                            spellCheck={false}
+                                        />
+                                        {userNoteLastSaved && (
+                                            <p className="text-xs text-gray-400 mt-2 text-right">
+                                                Last saved: {formatTimestamp(userNoteLastSaved)}
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="bg-white border border-gray-200 rounded-xl p-4 min-h-[300px]">
+                                        {renderUserNotePreview(userNoteContent)}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

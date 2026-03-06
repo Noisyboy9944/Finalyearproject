@@ -98,6 +98,23 @@ class CourseNote(BaseModel):
     content: str
     order: int
 
+class UserNote(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_email: str
+    unit_id: str
+    content: str = ""
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserNoteInput(BaseModel):
+    content: str
+
+class UserNoteResponse(BaseModel):
+    id: str
+    unit_id: str
+    content: str
+    updated_at: str
+
 class ChatMessageInput(BaseModel):
     message: str
     session_id: str
@@ -126,6 +143,23 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+from fastapi import Header
+
+async def get_current_user(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return email
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # --- Routes ---
 
@@ -219,6 +253,53 @@ async def get_video(video_id: str):
 async def get_notes(unit_id: str):
     notes = await db.course_notes.find({"unit_id": unit_id}, {"_id": 0}).sort("order", 1).to_list(100)
     return notes
+
+# --- User Personal Notes ---
+@api_router.get("/user-notes/{unit_id}", response_model=Optional[UserNoteResponse])
+async def get_user_note(unit_id: str, user_email: str = Depends(get_current_user)):
+    note = await db.user_notes.find_one(
+        {"user_email": user_email, "unit_id": unit_id},
+        {"_id": 0}
+    )
+    if not note:
+        return None
+    note["updated_at"] = note.get("updated_at", "")
+    if isinstance(note["updated_at"], datetime):
+        note["updated_at"] = note["updated_at"].isoformat()
+    return note
+
+@api_router.put("/user-notes/{unit_id}", response_model=UserNoteResponse)
+async def save_user_note(unit_id: str, note_input: UserNoteInput, user_email: str = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    existing = await db.user_notes.find_one({"user_email": user_email, "unit_id": unit_id})
+    
+    if existing:
+        await db.user_notes.update_one(
+            {"user_email": user_email, "unit_id": unit_id},
+            {"$set": {"content": note_input.content, "updated_at": now.isoformat()}}
+        )
+        return {
+            "id": existing.get("id", str(uuid.uuid4())),
+            "unit_id": unit_id,
+            "content": note_input.content,
+            "updated_at": now.isoformat()
+        }
+    else:
+        note = UserNote(
+            user_email=user_email,
+            unit_id=unit_id,
+            content=note_input.content,
+            updated_at=now
+        )
+        doc = note.model_dump()
+        doc["updated_at"] = doc["updated_at"].isoformat()
+        await db.user_notes.insert_one(doc)
+        return {
+            "id": note.id,
+            "unit_id": unit_id,
+            "content": note_input.content,
+            "updated_at": now.isoformat()
+        }
 
 # --- Chatbot ---
 @api_router.post("/chat", response_model=ChatMessageResponse)

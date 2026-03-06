@@ -194,6 +194,145 @@ class UniLearnHubAPITester:
             return True
         return False
 
+    def test_user_personal_notes(self):
+        """Test User Personal Notes API (JWT-authenticated editable notes)"""
+        if not self.unit_id:
+            print("❌ No unit_id available for notes testing")
+            return False
+        
+        if not self.token:
+            print("❌ No authentication token available")
+            return False
+
+        print(f"\n🔍 Testing User Personal Notes API for unit: {self.unit_id}")
+        
+        # Test 1: Initial GET (should be null/empty)
+        print("\n   1️⃣ Testing initial GET (should return null)")
+        success, initial_note = self.run_test(
+            "Get Initial User Note (null expected)",
+            "GET",
+            f"user-notes/{self.unit_id}",
+            200,
+            auth_required=True
+        )
+        if success:
+            if initial_note is None:
+                print("   ✅ Initial note is null as expected")
+            else:
+                print(f"   ⚠️ Found existing note: {str(initial_note)[:100]}...")
+        else:
+            return False
+
+        # Test 2: Create a note with PUT
+        print("\n   2️⃣ Testing note creation with PUT")
+        create_content = "# My Study Notes\n\nThis is a test note with **bold** text and `code snippets`.\n\n## Key Points\n- Point 1\n- Point 2"
+        
+        success, created_note = self.run_test(
+            "Create User Note",
+            "PUT",
+            f"user-notes/{self.unit_id}",
+            200,
+            data={"content": create_content},
+            auth_required=True
+        )
+        if success and created_note:
+            print(f"   ✅ Note created - ID: {created_note.get('id', 'N/A')}")
+            print(f"   Content length: {len(created_note.get('content', ''))}")
+            print(f"   Updated at: {created_note.get('updated_at', 'N/A')}")
+        else:
+            return False
+
+        # Test 3: Retrieve the created note
+        print("\n   3️⃣ Testing note retrieval after creation")
+        success, retrieved_note = self.run_test(
+            "Get Created User Note",
+            "GET",
+            f"user-notes/{self.unit_id}",
+            200,
+            auth_required=True
+        )
+        if success and retrieved_note:
+            if retrieved_note.get('content') == create_content:
+                print("   ✅ Retrieved note matches created content")
+            else:
+                print("   ❌ Content mismatch between created and retrieved note")
+                return False
+        else:
+            return False
+
+        # Test 4: Update the note
+        print("\n   4️⃣ Testing note update")
+        update_content = "# Updated Study Notes\n\nThis note has been updated!\n\n## New Section\nAdditional information added."
+        
+        success, updated_note = self.run_test(
+            "Update User Note",
+            "PUT",
+            f"user-notes/{self.unit_id}",
+            200,
+            data={"content": update_content},
+            auth_required=True
+        )
+        if success and updated_note:
+            print(f"   ✅ Note updated - Content length: {len(updated_note.get('content', ''))}")
+            print(f"   Updated at: {updated_note.get('updated_at', 'N/A')}")
+        else:
+            return False
+
+        # Test 5: Verify the update
+        print("\n   5️⃣ Testing note retrieval after update")
+        success, final_note = self.run_test(
+            "Get Updated User Note",
+            "GET",
+            f"user-notes/{self.unit_id}",
+            200,
+            auth_required=True
+        )
+        if success and final_note:
+            if final_note.get('content') == update_content:
+                print("   ✅ Retrieved note matches updated content")
+            else:
+                print("   ❌ Content mismatch after update")
+                return False
+        else:
+            return False
+
+        # Test 6: Test unauthorized access (no token)
+        print("\n   6️⃣ Testing unauthorized access (no token)")
+        url = f"{self.base_url}/user-notes/{self.unit_id}"
+        headers = {'Content-Type': 'application/json'}
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 401:
+                print("   ✅ Correctly rejected unauthorized request (401)")
+            else:
+                print(f"   ❌ Expected 401, got {response.status_code}")
+                return False
+        except Exception as e:
+            print(f"   ❌ Error testing unauthorized access: {e}")
+            return False
+
+        # Test 7: Test invalid token
+        print("\n   7️⃣ Testing invalid token")
+        invalid_headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer invalid-token-12345'
+        }
+        
+        try:
+            response = requests.get(url, headers=invalid_headers, timeout=10)
+            if response.status_code == 401:
+                print("   ✅ Correctly rejected invalid token (401)")
+            else:
+                print(f"   ❌ Expected 401 for invalid token, got {response.status_code}")
+                return False
+        except Exception as e:
+            print(f"   ❌ Error testing invalid token: {e}")
+            return False
+
+        print("\n   🎉 ALL USER PERSONAL NOTES TESTS PASSED!")
+        return True
+
     def test_get_stats(self):
         """Test getting platform statistics"""
         success, response = self.run_test(
@@ -327,6 +466,7 @@ def main():
         ("Get Subject Units", lambda: tester.test_get_subject_units()),
         ("Get Unit Videos", lambda: tester.test_get_unit_videos()),
         ("Get Unit Course Notes", lambda: tester.test_get_unit_notes()),
+        ("User Personal Notes API", lambda: tester.test_user_personal_notes()),
         ("Get Platform Stats", lambda: tester.test_get_stats()),
         ("Explore Courses", lambda: tester.test_explore_courses()),
         ("AI Chatbot Test", lambda: tester.test_chatbot()),
